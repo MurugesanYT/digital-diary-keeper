@@ -8,6 +8,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
+// Define allowed users
+const ALLOWED_USERS = {
+  'Kabilan': 'Kabilan_M',
+  'Afrin_Tabassum': 'Harry James Potter',
+  'Admin': 'Admin'
+};
+
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState(null);
@@ -136,20 +143,39 @@ export default function Index() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const email = e.target.email.value;
+    const username = e.target.email.value;
     const password = e.target.password.value;
 
+    // Check if credentials match allowed users
+    if (ALLOWED_USERS[username] !== password) {
+      toast({
+        title: "Error signing in",
+        description: "Invalid credentials",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If credentials are valid, create a Supabase account or sign in
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: `${username.toLowerCase()}@example.com`, // Convert to email format
+      password: password,
     });
 
     if (error) {
-      toast({
-        title: "Error signing in",
-        description: error.message,
-        variant: "destructive",
+      // If login fails, try to create the account
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: `${username.toLowerCase()}@example.com`,
+        password: password,
       });
+
+      if (signUpError) {
+        toast({
+          title: "Error signing in",
+          description: signUpError.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -174,7 +200,7 @@ export default function Index() {
         <Card className="w-[350px] p-6">
           <form onSubmit={handleLogin} className="space-y-4">
             <h2 className="text-2xl font-bold text-center">Login</h2>
-            <Input name="email" type="email" placeholder="Email" required />
+            <Input name="email" type="text" placeholder="Username" required />
             <Input name="password" type="password" placeholder="Password" required />
             <Button type="submit" className="w-full">Login</Button>
           </form>
