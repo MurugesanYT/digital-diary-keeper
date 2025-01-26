@@ -8,18 +8,18 @@ import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-// Define allowed users with proper email format
+// Define allowed users with proper email format and minimum 6 character passwords
 const ALLOWED_USERS = {
   'Kabilan': {
-    password: 'Kabilan_M',
+    password: 'Kabilan_M123',  // Added "123" to meet minimum length
     email: 'kabilan.diary@example.com'
   },
   'Afrin_Tabassum': {
-    password: 'Harry James Potter',
+    password: 'Harry James Potter',  // Already meets minimum length
     email: 'afrin.diary@example.com'
   },
   'Admin': {
-    password: 'Admin',
+    password: 'Admin123',  // Added "123" to meet minimum length
     email: 'admin.diary@example.com'
   }
 };
@@ -173,6 +173,7 @@ export default function Index() {
       });
 
       if (signInError) {
+        console.error('Sign in error:', signInError);
         // If sign in fails, try to create the account
         const { error: signUpError } = await supabase.auth.signUp({
           email: ALLOWED_USERS[username].email,
