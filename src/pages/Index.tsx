@@ -8,11 +8,20 @@ import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-// Define allowed users
+// Define allowed users with proper email format
 const ALLOWED_USERS = {
-  'Kabilan': 'Kabilan_M',
-  'Afrin_Tabassum': 'Harry James Potter',
-  'Admin': 'Admin'
+  'Kabilan': {
+    password: 'Kabilan_M',
+    email: 'kabilan.diary@example.com'
+  },
+  'Afrin_Tabassum': {
+    password: 'Harry James Potter',
+    email: 'afrin.diary@example.com'
+  },
+  'Admin': {
+    password: 'Admin',
+    email: 'admin.diary@example.com'
+  }
 };
 
 export default function Index() {
@@ -147,7 +156,7 @@ export default function Index() {
     const password = e.target.password.value;
 
     // Check if credentials match allowed users
-    if (ALLOWED_USERS[username] !== password) {
+    if (!ALLOWED_USERS[username] || ALLOWED_USERS[username].password !== password) {
       toast({
         title: "Error signing in",
         description: "Invalid credentials",
@@ -156,26 +165,58 @@ export default function Index() {
       return;
     }
 
-    // If credentials are valid, create a Supabase account or sign in
-    const { error } = await supabase.auth.signInWithPassword({
-      email: `${username.toLowerCase()}@example.com`, // Convert to email format
-      password: password,
-    });
-
-    if (error) {
-      // If login fails, try to create the account
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: `${username.toLowerCase()}@example.com`,
+    try {
+      // First try to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: ALLOWED_USERS[username].email,
         password: password,
       });
 
-      if (signUpError) {
-        toast({
-          title: "Error signing in",
-          description: signUpError.message,
-          variant: "destructive",
+      if (signInError) {
+        // If sign in fails, try to create the account
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: ALLOWED_USERS[username].email,
+          password: password,
         });
+
+        if (signUpError) {
+          console.error('Sign up error:', signUpError);
+          toast({
+            title: "Error creating account",
+            description: signUpError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // After successful signup, try signing in again
+        const { error: finalSignInError } = await supabase.auth.signInWithPassword({
+          email: ALLOWED_USERS[username].email,
+          password: password,
+        });
+
+        if (finalSignInError) {
+          console.error('Final sign in error:', finalSignInError);
+          toast({
+            title: "Error signing in",
+            description: finalSignInError.message,
+            variant: "destructive",
+          });
+          return;
+        }
       }
+
+      toast({
+        title: "Success",
+        description: "Signed in successfully",
+      });
+    } catch (error) {
+      console.error('Authentication error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
     }
   };
 
