@@ -1,27 +1,37 @@
 import { useEffect, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
-// Define allowed users with proper email format and minimum 6 character passwords
 const ALLOWED_USERS = {
   'Kabilan': {
-    password: 'Kabilan_M123',  // Added "123" to meet minimum length
+    password: 'Kabilan_M123',
     email: 'kabilan.diary@example.com'
   },
   'Afrin_Tabassum': {
-    password: 'Harry James Potter',  // Already meets minimum length
+    password: 'Harry James Potter',
     email: 'afrin.diary@example.com'
   },
   'Admin': {
-    password: 'Admin123',  // Added "123" to meet minimum length
+    password: 'Admin123',
     email: 'admin.diary@example.com'
   }
+};
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ['link', 'image'],
+    ['clean']
+  ],
 };
 
 export default function Index() {
@@ -72,7 +82,7 @@ export default function Index() {
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     let query = supabase
       .from('diary_entries')
-      .select('*')
+      .select('*, profiles(username)')
       .gte('created_at', `${formattedDate}T00:00:00`)
       .lte('created_at', `${formattedDate}T23:59:59`);
 
@@ -127,6 +137,29 @@ export default function Index() {
     loadEntries(date);
   };
 
+  const updateEntry = async (id, newContent) => {
+    const { error } = await supabase
+      .from('diary_entries')
+      .update({ content: newContent })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: "Error updating entry",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Success",
+      description: "Entry updated successfully",
+    });
+
+    loadEntries(date);
+  };
+
   const deleteEntry = async (id) => {
     const { error } = await supabase
       .from('diary_entries')
@@ -155,7 +188,6 @@ export default function Index() {
     const username = e.target.email.value;
     const password = e.target.password.value;
 
-    // Check if credentials match allowed users
     if (!ALLOWED_USERS[username] || ALLOWED_USERS[username].password !== password) {
       toast({
         title: "Error signing in",
@@ -166,22 +198,18 @@ export default function Index() {
     }
 
     try {
-      // First try to sign up the user
       const { error: signUpError } = await supabase.auth.signUp({
         email: ALLOWED_USERS[username].email,
         password: password,
       });
 
       if (signUpError) {
-        console.error('Sign up error:', signUpError);
-        // If signup fails (likely because user exists), try to sign in
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: ALLOWED_USERS[username].email,
           password: password,
         });
 
         if (signInError) {
-          console.error('Sign in error:', signInError);
           toast({
             title: "Error signing in",
             description: signInError.message,
@@ -191,13 +219,11 @@ export default function Index() {
         }
       }
 
-      // If we get here, either signup or signin was successful
       toast({
         title: "Success",
         description: "Signed in successfully",
       });
     } catch (error) {
-      console.error('Authentication error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -247,12 +273,15 @@ export default function Index() {
         <div>
           <Card className="p-4">
             <h2 className="text-xl font-semibold mb-4">New Entry</h2>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write about your day..."
-              className="min-h-[200px] mb-4"
-            />
+            <div className="mb-4">
+              <ReactQuill
+                value={content}
+                onChange={setContent}
+                modules={quillModules}
+                placeholder="Write about your day..."
+                className="h-[200px] mb-4"
+              />
+            </div>
             <Button onClick={saveEntry}>Save Entry</Button>
           </Card>
         </div>
@@ -274,16 +303,30 @@ export default function Index() {
             <div className="space-y-4">
               {entries.map((entry) => (
                 <Card key={entry.id} className="p-4">
-                  <div dangerouslySetInnerHTML={{ __html: entry.content }} />
-                  <div className="flex justify-end mt-2">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteEntry(entry.id)}
-                    >
-                      Delete
-                    </Button>
+                  <div className="mb-2">
+                    {isAdmin && entry.profiles?.username && (
+                      <p className="text-sm text-gray-500 mb-2">
+                        Written by: {entry.profiles.username}
+                      </p>
+                    )}
+                    <ReactQuill
+                      value={entry.content}
+                      onChange={(value) => updateEntry(entry.id, value)}
+                      modules={quillModules}
+                      readOnly={!isAdmin && entry.user_id !== session?.user?.id}
+                    />
                   </div>
+                  {(isAdmin || entry.user_id === session?.user?.id) && (
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteEntry(entry.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                 </Card>
               ))}
               {entries.length === 0 && (
@@ -295,4 +338,4 @@ export default function Index() {
       </div>
     </div>
   );
-};
+}
