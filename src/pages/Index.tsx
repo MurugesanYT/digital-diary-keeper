@@ -166,47 +166,32 @@ export default function Index() {
     }
 
     try {
-      // First try to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // First try to sign up the user
+      const { error: signUpError } = await supabase.auth.signUp({
         email: ALLOWED_USERS[username].email,
         password: password,
       });
 
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        // If sign in fails, try to create the account
-        const { error: signUpError } = await supabase.auth.signUp({
+      if (signUpError) {
+        console.error('Sign up error:', signUpError);
+        // If signup fails (likely because user exists), try to sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email: ALLOWED_USERS[username].email,
           password: password,
         });
 
-        if (signUpError) {
-          console.error('Sign up error:', signUpError);
-          toast({
-            title: "Error creating account",
-            description: signUpError.message,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // After successful signup, try signing in again
-        const { error: finalSignInError } = await supabase.auth.signInWithPassword({
-          email: ALLOWED_USERS[username].email,
-          password: password,
-        });
-
-        if (finalSignInError) {
-          console.error('Final sign in error:', finalSignInError);
+        if (signInError) {
+          console.error('Sign in error:', signInError);
           toast({
             title: "Error signing in",
-            description: finalSignInError.message,
+            description: signInError.message,
             variant: "destructive",
           });
           return;
         }
       }
 
+      // If we get here, either signup or signin was successful
       toast({
         title: "Success",
         description: "Signed in successfully",
@@ -310,4 +295,4 @@ export default function Index() {
       </div>
     </div>
   );
-}
+};
